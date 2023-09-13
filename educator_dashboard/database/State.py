@@ -59,44 +59,55 @@ class State:
             
         return {'string': string_fmt, 'value':frac}
     
-    def stage_fraction_completed(self, stage):
-        if stage is None:
-            return 1.0
-        markers = self.markers[str(stage)]
+    
+    def stage_fraction_completed(self, stage_index):
+        return self.stage_progress(stage_index)['percent']
+    
+    def stage_progress(self, stage_index):
+        if stage_index is None:
+            return {'percent':nan, 'total':0, 'current':0}
+        if isinstance(stage_index, (str, int)):
+            stage_index = str(stage_index)
         
-        if markers is None:
-            return 1.0
-        current_stage_marker = self.stages[str(stage)]['marker']
-        total = len(markers)
-        if current_stage_marker not in markers:
-            return nan
-        current = markers.index(current_stage_marker) + 1
-        frac = float(current) / float(total)
-        return frac
+        stage = self.stages.get(stage_index,{})
+        
+        if 'progress' in stage.keys():
+            progress = {
+                'fraction': stage.get('progress',nan),
+                'n_markers': stage.get('n_markers',1),
+                'max_marker_index': stage.get('max_marker_index',1),
+            }
+            return progress
+        else:
+            markers = self.markers[str(stage_index)]
+            if markers is None:
+                return {'percent':1, 'total':1, 'current':1}
+            current_stage_marker = self.stages[str(stage_index)]['marker']
+            total = len(markers)
+            if current_stage_marker not in markers:
+                return {'percent':nan, 'total':total, 'current':0}
+            current = markers.index(current_stage_marker) + 1
+            frac = float(current) / float(total)
+            return {'percent':frac, 'total':total, 'current':current}
+        
+    
+    @property
+    def story_progress(self):
+        progress = {}
+        for key, value in self.stages.items():
+            progress[key] = self.stage_progress(key)
+        return progress
+            
+            
+        
     
     def total_fraction_completed(self):
         total = []
         current = []
         for key, stage in self.stages.items():
-            markers = self.markers.get(key,None)
-            if markers is not None:
-                total.append(len(markers))
-                if self.stage_index == int(key):
-                    if self.current_marker in markers:
-                        val = markers.index(self.current_marker) + 1
-                    else:
-                        val = nan
-                elif self.max_stage_index > int(key):
-                    # if true, then stage key is complete
-                    val = len(markers)
-                elif self.stage_index < int(key):
-                    # if false, then stage key is not complete
-                    val = 0 #markers.index(stage['marker']) + 1
-                else:
-                    val = 0
-
-                current.append(val)
-        # print(total, current)
+            stage_progress = self.stage_progress(key)
+            total.append(stage_progress['total'])
+            current.append(stage_progress['current'])
         if nan in current:
             frac = nan
         else:
