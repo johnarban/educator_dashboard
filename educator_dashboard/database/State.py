@@ -73,9 +73,9 @@ class State:
         
         if 'progress' in stage.keys():
             progress = {
-                'fraction': stage.get('progress',nan),
-                'n_markers': stage.get('n_markers',1),
-                'max_marker_index': stage.get('max_marker_index',1),
+                'percent': stage.get('progress',nan),
+                'total': stage.get('n_markers',1),
+                'current': stage.get('max_marker_index',1),
             }
             return progress
         else:
