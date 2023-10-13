@@ -9,7 +9,7 @@
         </div>
 
         <div  v-if="!hideResponses" class="response-row" v-for="(response, index) in responseList">
-          <div class="name-item" v-if="names != null" >
+          <div class="name-item" v-if="names != null && !hideName" >
             {{ getName(index) }}
           </div>
             <div class="response-item">
@@ -60,6 +60,11 @@ export default {
       type: Boolean,
       default: false
     },
+
+    hideName: {
+      type: Boolean,
+      default: false
+    },
     
   },
 
@@ -107,32 +112,47 @@ export default {
   /* grid-template-columns: auto auto;
   grid-template-rows: auto; */
   /* grid-gap: 10px; */
-  background-color: rgba(2, 2, 2, 0.127);
+
+  padding: 0.5rem 0rem;
+  margin-left: 1rem;
 }
 
 .free-response-question div {
-  padding: 0.25rem;
+  /* padding: 0.25rem; */
 }
 .short-question {
   display: inline-block;
-  background-color: lightgreen;
   
 }
 .question {
-  background-color: lightblue;
+  display: inline-block;
+  color: black;
 }
 
 .response-row {
-  background-color: rgb(227, 240, 128);
+
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+  gap: 0.1rem;
+  margin-top: 0.5rem;
 }
 
 .response-item {
   display: inline-block;
-  background-color: lightcoral;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--md-grey-900);
+  background-color: var(--md-amber-100);
+
 }
 
 .name-item {
   display: inline-block;
-  background-color: lightpink;
+  font-weight: bold;
+  color: var(--md-grey-900);
+  padding-left: 0.5rem;
+  margin-top: 1rem;
+
 }
 </style>

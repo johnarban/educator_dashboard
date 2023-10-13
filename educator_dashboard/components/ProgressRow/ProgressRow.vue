@@ -137,7 +137,7 @@ export default {
 }
 
 .progress-table-row-selected {
-  background-color: #d7d7d7 !important;
+  background-color: var(--md-amber-100) !important;
 }
 
 .progress-table-progress {
@@ -166,27 +166,28 @@ export default {
 }
 
 .completed {
-  background-color: rgb(76, 175, 80);
+  background-color: var(--md-cyan-700);
+  
 }
 
 .completed-lighter {
-  background-color: rgb(76, 175, 80,0.25);
+  background-color: var(--md-cyan-700);
 }
 
 .in-progress {
-  background-color: rgb(33, 150, 243);
+  background-color: var(--md-cyan-700);
 }
 
 .in-progress-lighter {
-  background-color: rgb(33, 150, 243,0.55);
+  background-color: var(--md-deep-orange-300);
 }
 
 .not-started {
-  background-color: rgb(202, 48, 48);
+  background-color: var(--md-deep-orange-300);
 }
 
 .not-started-lighter {
-  background-color: rgb(202, 48, 48,0.25);
+  background-color: var(--md-deep-orange-300);
 }
 
 </style>

@@ -2,17 +2,18 @@ import solara
 
 import reacton.ipyvuetify as rv
 
-from pandas import DataFrame, Series, concat
+import pandas as pd
+from pandas import DataFrame, Series
 from ..database.Query import QueryCosmicDSApi as Query
 import plotly.express as px
-from .Collapsable import Collapsable
+from .Collapsible import Collapsible
 
 from .TableComponents import DataTable
 
 from numpy import hstack
 
 @solara.component
-def MultipleChoiceStageSummary(roster, stage = None):
+def MultipleChoiceStageSummary(roster, stage = None, label= None):
     
     if isinstance(roster, solara.Reactive):
         roster = roster.value
@@ -44,59 +45,70 @@ def MultipleChoiceStageSummary(roster, stage = None):
     tries_1d = hstack(tries)
     tries_1d = Series(tries_1d).dropna()
     
-    
     with solara.GridFixed(columns=1, justify_items='stretch', align_items='start') as main:
-        solara.Markdown(f"### Stage {stage}")
+        solara.Markdown(f"### Stage {stage}: {label}")
+
+        # Table of questions with average #of tries across whole space
+        with solara.Column():
+            
+            solara.Markdown("Students on average took {} tries to complete the multiple choice questions".format(tries_1d[tries_1d>0].mean().round(2)))
+
+            keys = ['Question', 'Completed by', 'Average # of Tries']
+            # headers appropriate for vuetify headers prop
+            headers = [{'text': k, 'value': k} for k in keys]
+            
+            
+            data_keys = ['Question', 'Completed by', 'Average # of Tries', 'key']
+            
+            # https://www.phind.com/search?cache=qn70q6onf78gz5b035fmmosx
+            data_values = {k: summary_stats[k].astype(str) for k in data_keys}
+            data_values = [dict(zip(data_values.keys(), values)) for values in zip(*data_values.values())]
+
+
+            def on_change(v):                    
+                selected_question.set(v if v is None else v['key'])
+            
+            DataTable(
+                headers=headers,
+                items=data_values,
+                on_row_click=on_change,
+                show_index=True,
+                class_ = "mc-question-summary-table"
+            )
+
         with solara.Columns([1,1]):
+            if (selected_question.value is not None) and (selected_question.value != '') and (selected_question.value in flat_mc_responses.keys()):
             
-            # column with a table of questions with average #of tries
-            with solara.Column():
-                
-                solara.Markdown("Students on average took {} tries to complete the multiple choice questions".format(tries_1d[tries_1d>0].mean().round(2)))
+                # a column for a particular question showing all student responses
+                with solara.Column():
+                        # Add numeral index after Question
+                        solara.Markdown(f"""***Question:***
+                                    {roster.question_keys()[selected_question.value]['text']}
+                                    """)
+                        
+                        df = DataFrame(flat_mc_responses[selected_question.value])
+                        fig = px.histogram(df, 'tries',  labels={'tries': "# of Tries"}, range_x=[-0.6,3.6], category_orders={'tries': [0,1,2,3,4]})
+                        fig.update_xaxes(type='category')
+                        solara.FigurePlotly(fig)
+                                        
+                with Collapsible(header='Individual Student Tries for Question'):
+                    # Round tries to integers and leave a blank for nan values
+                    df['rounded_tries'] = df['tries'].round().astype('Int64')
+                    df['rounded_tries'] = df['rounded_tries'].apply(lambda x: '' if pd.isna(x) else x)
 
-                keys = ['Question', 'Completed by', 'Average # of Tries']
-                # headers appropriate for vuetify headers prop
-                headers = [{'text': k, 'value': k} for k in keys]
-                
-                
-                data_keys = ['Question', 'Completed by', 'Average # of Tries', 'key']
-                
-                # https://www.phind.com/search?cache=qn70q6onf78gz5b035fmmosx
-                data_values = {k: summary_stats[k].astype(str) for k in data_keys}
-                data_values = [dict(zip(data_values.keys(), values)) for values in zip(*data_values.values())]
-
-
-                def on_change(v):                    
-                    selected_question.set(v if v is None else v['key'])
-                
-                DataTable(
-                    headers=headers,
-                    items=data_values,
-                    on_row_click=on_change,
-                    show_index=True,
-                )
-            
-            # a column for a particular question showing all student responses
-            with solara.Column():
-                if (selected_question.value is not None) and (selected_question.value != '') and (selected_question.value in flat_mc_responses.keys()):
-                    # Add numeral index after Question
-                    solara.Markdown(f"""***Question:***
-                                {roster.question_keys()[selected_question.value]['text']}
-                                """)
-                    
-                    df = DataFrame(flat_mc_responses[selected_question.value])
-                    fig = px.histogram(df, 'tries',  labels={'tries': "# of Tries"}, range_x=[-0.6,3.6], category_orders={'tries': [0,1,2,3,4]})
-                    fig.update_xaxes(type='category')
-                    solara.FigurePlotly(fig)
-                    
-                    with Collapsable(header='Show Table'):
-                        DataTable(df = df[['student_id', 'tries']], class_ = "mc-question-summary-table")
+                    if 'name' in roster.students.columns:
+                        headers = [{'text': 'Name', 'value': 'name'}, {'text': 'Tries', 'value': 'rounded_tries'}]
+                        # add names to df
+                        df = df.merge(roster.students[['student_id', 'name']], on='student_id', how='left')
+                    else:
+                        headers = [{'text': 'Student ID', 'value': 'student_id'}, {'text': 'Tries', 'value': 'rounded_tries'}]
+                    DataTable(df = df, headers = headers, item_key = 'student_id', class_ = "mc-question-students-table")
         rv.Divider()
     return main
 
                 
 @solara.component
-def MultipleChoiceSummary(roster):
+def MultipleChoiceSummary(roster, stage_labels=[]):
     
     if isinstance(roster, solara.Reactive):
         roster = roster.value
@@ -109,10 +121,12 @@ def MultipleChoiceSummary(roster):
     stages = list(filter(lambda s: s.isdigit(),sorted(list(sorted(mc_responses.keys())))))
     
     for stage in stages:
-        MultipleChoiceStageSummary(roster, stage = stage)
+        index = int(stage) - 1
+        label = stage_labels[index]
+        MultipleChoiceStageSummary(roster, stage = stage, label = label)
 
 @solara.component
-def MultipleChoiceQuestionSingleStage(df = None, headers = None, stage = 0):
+def MultipleChoiceQuestionSingleStage(df = None, headers = None, stage = 0, label = None):
     
     if df is None:
         solara.Markdown("There are no completed multiple choice questions for this stage")
@@ -120,7 +134,7 @@ def MultipleChoiceQuestionSingleStage(df = None, headers = None, stage = 0):
     
     if isinstance(df, solara.Reactive):
         df = df.value
-    
+
     dquest, set_dquest = solara.use_state('')
    
     
@@ -151,34 +165,35 @@ def MultipleChoiceQuestionSingleStage(df = None, headers = None, stage = 0):
         bot = len([i for i in x if isgood(i)])
         if bot == 0:
             return '--'
-        return top/bot
+        return str(round(top/bot,2))
     
     avg_tries = df.tries.aggregate(avg)
     
 
     with solara.Row():
         solara.Markdown("""
-                        ### Stage {}
+                        ### Stage {}: {}
                         - Completed {} out of {} multiple choice questions
                         - Multiple Choice Score: {}/{}
-                        - Took on average {:0.2f} tries to complete the multiple choice questions
-                        """.format(stage, completed, total, points, total_points, avg_tries))    
+                        - Took on average {} tries to complete the multiple choice questions
+                        """.format(stage, label,  completed, total, points, total_points, avg_tries))    
         
     with solara.Row():
-        with solara.Columns([1,2]):
+        with solara.Columns([1,1]):
             with solara.Column():
-                if dquest is not None:
+                if len(dquest)>0:
                     solara.Markdown(f"**Question**: {dquest}")
                 else:
-                    solara.Markdown(f"**Select a question from table** ")
+                    solara.Markdown(f"**Select a row from table to see full question text.** ")
             with solara.Column():
-                DataTable(df = df, headers = headers, on_row_click=row_action, show_index=True)
+                DataTable(df = df, headers = headers, on_row_click=row_action, show_index=True, class_ = "mc-individual-student-table")
+    rv.Divider()
             
 
         
     
 @solara.component
-def MultipleChoiceQuestionSingleStudent(roster, sid = None):
+def MultipleChoiceQuestionSingleStudent(roster, sid = None, stage_labels = []):
     
     if not isinstance(sid, solara.Reactive):
         sid = solara.use_reactive(sid)
@@ -197,7 +212,8 @@ def MultipleChoiceQuestionSingleStudent(roster, sid = None):
     
     dflist = []
     for stage, v in mc_questions.items():
-
+        index = int(stage) - 1
+        label = stage_labels[index]
         
         df = DataFrame(v).T
         df['stage'] = stage
@@ -211,6 +227,5 @@ def MultipleChoiceQuestionSingleStudent(roster, sid = None):
             {'text': 'Tries', 'value': 'tries'},
             {'text': 'Score', 'value': 'score'},
         ]
-        with solara.Card():
-            MultipleChoiceQuestionSingleStage(df = df, headers = headers, stage = stage)
+        MultipleChoiceQuestionSingleStage(df = df, headers = headers, stage = stage, label = label)
             

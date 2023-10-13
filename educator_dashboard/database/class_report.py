@@ -122,10 +122,14 @@ class Roster():
         if self.data is None or self._refresh or refresh:
             res = self.query.get_class_data(class_id = self.class_id)
             self.data = res if res is not None else {'student_id':[]}
-            
+            if len(self.student_data) == 0:
+                groupdf = pd.DataFrame(self.data).groupby('student_id')
+                for student_id in groupdf.groups.keys():
+                    self.student_data[student_id] = groupdf.get_group(student_id).to_dict(orient='records')
         if df:
             return pd.DataFrame(self.data)
         return self.data
+            
     
     def get_student_data(self, student_id, refresh = False, df = False):
         if (student_id not in self.student_data.keys()) or self._refresh or refresh:
@@ -155,6 +159,30 @@ class Roster():
             self.class_summary = self.make_dataframe(pd.DataFrame({'H0':H0, 'age':Age}))
 
         return self.class_summary
+    
+    def class_measurement_status(self, refresh = False):
+        g = self.get_class_data(df=True, refresh = refresh).groupby('student_id')
+        nodist = g.apply(lambda x:  5-sum(x['est_dist_value'] == 0)) # number of distances
+        novel = g.apply(lambda x:  5-sum(x['velocity_value'] == 0)) # number of velocities
+        complete = (novel == 5) & (nodist==5)
+        df = pd.DataFrame({'distances': nodist, 'velocities': novel, 'complete': complete})
+        m = set(df.index)
+        a = set(self.student_ids)
+        d = a - m # students in roster but not in class data
+        for d in a - m:
+            df.loc[d] = {'distances': -9999, 'velocities': -9999, 'complete':False}
+        
+        # summary
+        summary = dict(
+                num_complete = sum(df['complete']), # number of students with complete data
+                num_incomplete = len(df) - sum(df['complete']), # number of students with incomplete data
+                num_dist = sum(df['distances'] != -9999), # number of students with distances
+                num_vel = sum(df['velocities'] != -9999), # number of students with velocities
+                num_good = sum((df['distances'] != -9999) & (df['velocities'] != -9999)), # number of students with good data
+                num_total = len(df), # number of students in class  
+                )
+        return {'summary':summary, 'status':df}
+        
     
     def get_student_by_id(self, student_id):
         if student_id not in self.student_ids:
@@ -291,6 +319,18 @@ class Roster():
                 else:
                     student['student']['name'] = student_names.get(student['student_id'], 'Student '+str(student['student_id']))
     
+    def get_student_name(self, sid = None):
+        if sid is None:
+            return 'None'
+        if len(self.roster) > 0:
+            index = self.student_ids.index(sid) if sid in self.student_ids else None
+            if index is not None:
+                return self.roster[index]['student'].get('name', sid)
+            else:
+                print(f'{sid} not in roster')
+        
+        return str(sid)
+    
     @property
     def responses(self):
         if len(self.roster) > 0:
@@ -299,6 +339,8 @@ class Roster():
         else:
             return self.make_dataframe(pd.DataFrame())
     
+    def convert_column_of_dates_to_datetime(self, dataframe_column):
+        return pd.to_datetime(dataframe_column).dt.tz_convert('US/Eastern').dt.strftime("%Y-%m-%d %H:%M:%S (Eastern)")
     
     @property
     def students(self):
@@ -307,6 +349,10 @@ class Roster():
             return self.make_dataframe(students)
         else:
             return pd.DataFrame({'student_id':[], 'username':[], 'class_id':[]})
+    
+    @property
+    def student_names(self):
+        return [self.get_student_name(sid) for sid in self.student_ids]
     
     @property
     def out_of(self):
@@ -333,7 +379,7 @@ class Roster():
             tot_perc.append(state.percent_completion)
         return self.l2d(how_far)['string'], tot_perc
     
-    def report(self, refresh = False):
+    def report(self, refresh = False, for_teacher = True):
         "refreshing data"
         
         if self._report is not None and not self._refresh and not refresh:
@@ -345,7 +391,7 @@ class Roster():
         roster = self
         if len(roster.roster) == 0:
             return None
-        if hasattr(roster,'stages'):
+        if hasattr(roster,'stages') and (not for_teacher):
             data = [[s.get('marker',None) for s in stage] for stage in roster.stages]
             cols = ['Stage 1 marker', 'Stage 3 marker', 'Stage 4 marker', 'Stage 5 marker', 'Stage 6 marker']
             c1 = {k:v for k,v in zip(cols, data)}
@@ -354,11 +400,7 @@ class Roster():
         else:
             df = pd.DataFrame({'student_id':roster.student_id['student_id']})
        
-        data = [[s.get('marker',None) for s in stage] for stage in roster.stages]
-        cols = ['Stage 1 marker', 'Stage 3 marker', 'Stage 4 marker', 'Stage 5 marker', 'Stage 6 marker']
-        c1 = {k:v for k,v in zip(cols, data)}
         
-        df = pd.DataFrame(c1)
         df['student_id'] = roster.student_id['student_id']
         # add a string column containing roster.students['username']
         df['username'] = roster.students['username'].values
@@ -442,6 +484,9 @@ class Roster():
         print(' >>> Getting class data')
         self.get_class_data()
         self._refresh = False
+    
+    def empty_copy(self):
+        return Roster(class_id = self.class_id)
 
 
 

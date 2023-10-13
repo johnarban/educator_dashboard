@@ -2,7 +2,6 @@
 import solara
 from pandas import DataFrame
 
-from .MultiStepProgressBar import MultiStepProgressBar
 from .TableFromRows import TableFromRows
 from .ProgressRow import ProgressRow
 
@@ -31,6 +30,7 @@ def StudentProgressRow(progress,
         'ID': progress['student_id'],
         'Name': progress['student_name'],
         'Total Points': progress['total_points'],
+        'Progress': f"{progress['percent_complete']}%"
     }
     
     def on_row_click(event):
@@ -73,20 +73,12 @@ def StudentProgressTable(roster = None,
     
     """
     
-    if roster is None:
-        if progress_data is None:
-            solara.Markdown("This class does not exist")
-            return
-        else:
-            progress_data = solara.use_reactive(progress_data)
-    else:
-        r = roster.value if isinstance(roster, solara.Reactive) else roster
-        progress_data = solara.use_reactive(r.short_report())
+    roster = solara.use_reactive(roster)
+    data = roster.value.short_report()
     
-    if progress_data.value is None:
-        return
+    if data is None:
+        return solara.Error(label="No data available. Please contact the CosmicDS team for help.", outlined=True, text = True)
     
-    data = progress_data.value
     
     # make sure we have a dataframe
     if isinstance(data, dict):
@@ -104,7 +96,7 @@ def StudentProgressTable(roster = None,
     
 
     if headers is None:
-        headers = ['', 'Student ID', 'Student Name', 'Points/available' ] + stage_labels
+        headers = ['', 'Student<br>ID', 'Student<br>Name', 'Points/<br>available', 'Progress<br>(%)'] + stage_labels
     with TableFromRows(headers=headers, table_height=height):
         for i in range(len(data)):
             max_stage_progress = data['progress'][i].split('%')[0]
@@ -121,6 +113,7 @@ def StudentProgressTable(roster = None,
                 'number_of_stages': 6,
                 'current_stage': int(data['max_stage_index'][i]),
                 'current_stage_progress': max_stage_progress,
+                'percent_complete': data['percent_story_complete'][i]
             }
 
             StudentProgressRow(progress = student_progress,

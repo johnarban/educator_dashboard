@@ -6,7 +6,11 @@ import pandas as pd
 
 
 @solara.component
-def TableUpload(file_info = None, upload_complete = None, allow_excel = False):
+def TableLoad(file_info = None, load_complete = None, allow_excel = False):
+    
+    
+    file_info = solara.use_reactive(file_info)
+    load_complete = solara.use_reactive(load_complete)
     
     valid_file, set_valid_file = solara.use_state(True)
     msg, set_msg = solara.use_state("")
@@ -20,31 +24,36 @@ def TableUpload(file_info = None, upload_complete = None, allow_excel = False):
         if isCSV or (isExcel and allow_excel):
             file_info.set(file)
             set_valid_file(True)
-            set_msg(f"Successfully uploaded {filename}!")
+            set_msg(f"Successfully read in {filename}!")
         else:
             set_valid_file(False)
-            set_msg(f"Upload of {filename} failed. Please upload a CSV file.")
+            set_msg(f"Failed to read {filename}. Please select a valid CSV file.")
         
-        upload_complete.set(True)
+        load_complete.set(True)
     
     def on_click():
         file_info.set(None)
-        upload_complete.set(False)
+        load_complete.set(False)
         set_msg("")
     
     with solara.Div():
-        solara.Markdown("Upload a CSV (comma-separated value) file containing student names and IDs. Include a header row with column names 'student_id' and 'name'.")
-        if not upload_complete.value:
+        solara.Markdown(r'''
+            Read in a local CSV (comma-separated value) file containing student IDs and names to display names in the dashboard.
+                        
+            * Include a header row with column names 'student_id' and 'name'. 
+            * To protect student privacy, this information remains on your computer and will NOT be uploaded to CosmicDS servers.
+        ''')
+        if not load_complete.value:
             solara.FileDrop(
                 on_file=on_file,
                 lazy=False, # puts data in the [data] part of FileInfo
             )
-        if upload_complete.value and valid_file:
+        if load_complete.value and valid_file:
             solara.Success(msg, dense=True, outlined=True, icon='mdi-file-check')
-        elif upload_complete.value and not valid_file:
+        elif load_complete.value and not valid_file:
             solara.Error(msg, dense=True, outlined=True, icon='mdi-file-alert')
         
-        solara.Button("Clear", on_click=on_click, disabled=not upload_complete.value)
+        solara.Button("Clear", on_click=on_click, disabled=not load_complete.value)
 
     
     
@@ -82,17 +91,22 @@ def TableDisplay(file_info, has_header = False, on_table = None):
     solara.DataFrame(table.head(5))
 
 @solara.component
-def SetColumns(table, fixed_table = None):
+def SetColumns(table, fixed_table = None, table_set = None):
     
+    student_id_column = solara.use_reactive('student_id')
+    name_column = solara.use_reactive('name')
+    table_set = solara.use_reactive(table_set)
     
+    if table.value is None:
+        fixed_table.set(None)
+        
+
     if table.value is not None:
 
         cols = list(table.value.columns.to_numpy().astype(str))
         cols = [c.strip() for c in cols]
         table.value.columns = cols
-        student_id_column = solara.use_reactive('student_id')
-        name_column = solara.use_reactive('name')
-    
+
 
         if 'student_id' not in cols:
             if student_id_column.value not in cols:
@@ -106,5 +120,8 @@ def SetColumns(table, fixed_table = None):
         if student_id_column.value in cols and name_column.value in cols:
             df = table.value[[student_id_column.value, name_column.value]]
             df.columns = ['student_id', 'name']
+            table_set.set(df is not None)
             fixed_table.set(df)
+            
+    
 
