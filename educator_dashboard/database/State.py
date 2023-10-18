@@ -89,8 +89,8 @@ class State:
             total = len(markers)
             if current_stage_marker not in markers:
                 return {'percent':nan, 'total':total, 'current':0}
-            current = markers.index(current_stage_marker) + 1
-            frac = float(current) / float(total)
+            current = markers.index(current_stage_marker)
+            frac = float(current) / (float(total) - 1)
             return {'percent':frac, 'total':total, 'current':current}
         
     
