@@ -72,6 +72,9 @@ def AgeHoHistogram(data, which = 'age', subset = None, subset_label = None, main
         fig.add_trace(bar)
         # show legend
     # fig.update_layout(showlegend=True)
+    fig.layout.xaxis.fixedrange = True
+    fig.layout.yaxis.fixedrange = True
+
     fig.update_layout(
         legend = dict(
             orientation="v",

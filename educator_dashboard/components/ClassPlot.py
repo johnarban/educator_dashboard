@@ -105,7 +105,8 @@ def ClassPlot(dataframe,
                                             marker_symbol = 'circle',   
                                             marker_size = 10,
                                             marker_color = '#FF8A65'))
-    
+    fig.layout.xaxis.fixedrange = True
+    fig.layout.yaxis.fixedrange = True
     fig.update_layout(
         legend = dict(
             orientation="v",
