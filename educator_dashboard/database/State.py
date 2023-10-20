@@ -114,6 +114,7 @@ class State:
         if nan in current:
             frac = nan
         else:
+            total = [t-1 if t > 1 else 1 for t in total]
             frac = int(100 * float(sum(current)) / float(sum(total)))
         return {'percent':frac, 'total':sum(total), 'current':sum(current)}
     
